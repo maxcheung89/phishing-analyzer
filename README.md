@@ -33,7 +33,7 @@
 ## 📦 Installation
 
 ```bash
-git clone https://github.com/yourusername/phishing-analyzer.git
+git clone https://github.com/maxcheung89/phishing-analyzer.git
 cd phishing-analyzer
 ```
 
