@@ -1,0 +1,13 @@
+version: '3.9'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: phishing-web
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend/static/results:/app/backend/static/results
+    restart: unless-stopped

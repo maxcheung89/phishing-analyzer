@@ -1,0 +1,4 @@
+  File "/app/analyzer.py", line 30
+    if __name__ == \"__main__\":
+                    ^
+SyntaxError: unexpected character after line continuation character

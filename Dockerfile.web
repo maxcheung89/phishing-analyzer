@@ -1,0 +1,14 @@
+# Dockerfile (root-level, single-container)
+FROM python:3.10-slim
+
+WORKDIR /app
+
+COPY backend/ /app/
+COPY requirements.txt /app/
+COPY secrets/ /app/secrets/
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+EXPOSE 5000
+
+CMD ["python", "app.py"]

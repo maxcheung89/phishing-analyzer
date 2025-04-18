@@ -1,0 +1,202 @@
+import os
+import uuid
+import subprocess
+import json
+import re
+import email
+from flask import Flask, request, render_template, send_from_directory
+from vt import scan_url
+from db import init_db, log_scan_result, get_history
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
+import base64
+
+UPLOAD_DIR = "backend/static/results"
+KEY_FILE_ENC = ".key.enc"
+
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app = Flask(__name__, static_folder='static')
+app.config['UPLOAD_FOLDER'] = UPLOAD_DIR
+
+
+def decrypt_vt_key():
+    password = os.getenv("VT_DECRYPT_PASS")
+    if not password:
+        raise ValueError("VT_DECRYPT_PASS not set.")
+
+    with open("secrets/.key.enc", "rb") as f:
+        data = f.read()
+        salt, enc_key = data[:16], data[16:]
+
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100_000,
+        backend=default_backend()
+    )
+    key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
+    return Fernet(key).decrypt(enc_key).decode()
+
+
+
+
+def extract_urls_from_eml(path):
+    with open(path, 'rb') as f:
+        msg = email.message_from_binary_file(f)
+        body = ""
+        if msg.is_multipart():
+            for part in msg.walk():
+                if part.get_content_type() == 'text/html':
+                    body = part.get_payload(decode=True).decode(errors='ignore')
+        else:
+            body = msg.get_payload(decode=True).decode(errors='ignore')
+        return re.findall(r'https?://[^\s"<>]+', body)
+
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    output = ""
+    vt_result = ""
+    vt_link = None
+    scan_logs = []
+    pcap_files = []
+
+    if request.method == "POST":
+        analysis_id = str(uuid.uuid4())
+        file = request.files.get("file")
+        url = request.form.get("url")
+        run_virustotal = request.form.get("vt")
+        result_path = os.path.abspath(app.config['UPLOAD_FOLDER'])
+        volume_mount = []
+        cmd = ["docker", "run", "--rm", "--privileged"]
+
+        if file:
+            filename = f"{analysis_id}.eml"
+            file_path = os.path.abspath(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            file.save(file_path)
+            container_path = f"/app/{filename}"
+            volume_mount = [
+                "-v", f"{result_path}:/app/results",
+                "-v", f"{file_path}:{container_path}"
+            ]
+            cmd += volume_mount + ["-e", f"SCAN_ID={analysis_id}", "phishing-analyzer"]
+
+            extracted_urls = extract_urls_from_eml(file_path)
+            output += f"[+] Extracted {len(extracted_urls)} URLs:\n"
+            for link in extracted_urls:
+                output += f"   - {link}\n"
+
+            if extracted_urls:
+                os.environ['VT_API_KEY'] = decrypt_vt_key()
+                vt_results = []
+                vt_links = []
+
+                for idx, single_url in enumerate(extracted_urls):
+                    url_id = f"{analysis_id}_{idx}"
+                    scan_target = single_url
+
+                    try:
+                        json_result = scan_url(single_url)
+                        vt_results.append({ "url": single_url, "result": json_result })
+                        vt_id = json_result['data']['id'].removeprefix('u-').split('-')[0]
+                        link = f"https://www.virustotal.com/gui/url/{vt_id}/detection"
+                        vt_links.append(link)
+                    except Exception as e:
+                        vt_results.append({ "url": single_url, "error": str(e) })
+                        link = None
+
+                    cmd_url = [
+                        "docker", "run", "--rm", "--privileged",
+                        "-v", f"{result_path}:/app/results",
+                        "-e", f"PHISH_URL={single_url}",
+                        "-e", f"SCAN_ID={url_id}",
+                        "phishing-analyzer"
+                    ]
+
+                    result = subprocess.run(cmd_url, capture_output=True, text=True, timeout=90)
+                    output += f"\n[+] Docker scan for {single_url}\n{result.stdout}\n{result.stderr}"
+
+                    log_name = f"{url_id}_log.txt"
+                    scan_logs.append(log_name)
+
+                    pcap_name = f"{url_id}.pcapng"
+                    if os.path.exists(os.path.join(result_path, pcap_name)):
+                        pcap_files.append(pcap_name)
+
+                    log_scan_result(
+                        url_id, scan_target, log_name, pcap_name if pcap_name in pcap_files else None,
+                        json.dumps(json_result), link
+                    )
+
+                vt_result = vt_results
+                vt_link = vt_links
+
+        elif url:
+            scan_target = url
+            os.environ['VT_API_KEY'] = decrypt_vt_key()
+            vt_json = scan_url(url)
+            vt_result = vt_json
+            vt_id = vt_json['data']['id'].removeprefix('u-').split('-')[0]
+            vt_link = [f"https://www.virustotal.com/gui/url/{vt_id}/detection"]
+
+            cmd += [
+                "-e", f"PHISH_URL={url}",
+                "-e", f"SCAN_ID={analysis_id}",
+                "-v", f"{result_path}:/app/results",
+                "phishing-analyzer"
+            ]
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+            output += f"\n[+] Docker scan for {url}\n{result.stdout}\n{result.stderr}"
+
+            log_name = f"{analysis_id}_log.txt"
+            log_path = os.path.join(result_path, log_name)
+            with open(log_path, "w") as f:
+                f.write(result.stdout + "\n" + result.stderr)
+
+            scan_logs.append(log_name)
+
+            pcap_name = f"{analysis_id}.pcapng"
+            if os.path.exists(os.path.join(result_path, pcap_name)):
+                pcap_files.append(pcap_name)
+                print("✅ PCAP File detected:", pcap_name)
+            else:
+                print("❌ PCAP File NOT found:", os.path.join(result_path, pcap_name))
+
+            log_scan_result(
+                analysis_id,
+                url,
+                log_name,
+                pcap_name if pcap_name in pcap_files else None,
+                json.dumps(vt_json),
+                vt_link[0] if vt_link else None
+            )
+
+
+        else:
+            output = "[-] No input provided."
+            return render_template("index.html", output=output)
+
+    return render_template(
+        "index.html",
+        output=output,
+        vt_result=vt_result,
+        vt_link=vt_link,
+        scan_logs=scan_logs,
+        pcap_files=pcap_files
+    )
+
+
+@app.route("/history")
+def history():
+    results = get_history()
+    return render_template("history.html", results=results)
+
+
+if __name__ == "__main__":
+    print("✅ Flask app is starting...")
+    init_db()
+    app.run(host="0.0.0.0", port=5000, debug=True)

@@ -1,0 +1,58 @@
+import os
+import subprocess
+import email
+import re
+
+def extract_urls_from_eml(path):
+    with open(path, 'rb') as f:
+        msg = email.message_from_binary_file(f)
+        body = ""
+        if msg.is_multipart():
+            for part in msg.walk():
+                if part.get_content_type() == 'text/html':
+                    body = part.get_payload(decode=True).decode(errors='ignore')
+        else:
+            body = msg.get_payload(decode=True).decode(errors='ignore')
+        return re.findall(r'https?://[^\s"<>]+', body)
+
+def main():
+    output_dir = "/app/results"
+    os.makedirs(output_dir, exist_ok=True)
+    subprocess.run(["chmod", "777", output_dir])
+
+    scan_id = os.getenv("SCAN_ID", "default")
+    phish_url = os.getenv("PHISH_URL")
+    eml_path = "suspect.eml"
+
+    if os.path.exists(eml_path):
+        print("[+] Scanning uploaded file with ClamAV...")
+        log = subprocess.getoutput(f"clamscan {eml_path}")
+        with open(f"{output_dir}/{scan_id}_log.txt", "w") as f:
+            f.write(log)
+            print(log)
+
+        print("\n[+] Extracting URLs from suspect.eml...")
+        urls = extract_urls_from_eml(eml_path)
+        with open(f"{output_dir}/{scan_id}_urls.txt", "w") as f:
+            for url in urls:
+                print("   -", url)
+                f.write(url + "\n")
+
+        print("[+] Capturing network traffic with tshark...")
+        subprocess.run(f"timeout 10 tshark -i any -a duration:10 -w {output_dir}/{scan_id}.pcapng", shell=True)
+
+    elif phish_url:
+        print(f"[+] Scanning URL: {phish_url}")
+        log = subprocess.getoutput(f"curl -I {phish_url}")
+        with open(f"{output_dir}/{scan_id}_log.txt", "w") as f:
+            f.write(log)
+            print(log)
+
+        print("[+] Capturing traffic with tshark...")
+        subprocess.run(f"timeout 10 tshark -i any -a duration:10 -w {output_dir}/{scan_id}.pcapng", shell=True)
+
+    else:
+        print("[-] No input provided")
+
+if __name__ == "__main__":
+    main()
