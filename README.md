@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://user-images.githubusercontent.com/your-screenshot.png" width="700" alt="Demo UI">
+  <img src="https://user-images.githubusercom/](https://github.com/maxcheung89/phishing-analyzer/blob/main/static/results/85409340-636d-4118-abd8-ae4b9c525800/Image.png" width="700" alt="Lincense & All right received by $Maxcheung89">
 </p>
 
 ---
