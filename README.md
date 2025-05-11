@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://user-images.githubusercom/](https://github.com/maxcheung89/phishing-analyzer/blob/main/static/results/85409340-636d-4118-abd8-ae4b9c525800/Image.png" width="700" alt="Lincense & All right received by $Maxcheung89">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Octicons-mark-github.svg/960px-Octicons-mark-github.svg.png" width="700" alt="Lincense & All right received by $Maxcheung89">
 </p>
 
 ---
@@ -132,12 +132,25 @@ phishing-analyzer/
 
 ## 📜 License
 
-This project is MIT-licensed — use, modify, share freely.  
-**But don't use it to phish anyone.**
+MIT License
+
+Copyright (c) 2025 @maxcheung89
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the “Software”), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+of the Software, and to permit persons to whom the Software is furnished to do so, 
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in 
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED...
+
 
 ---
 
 ## 📣 Like this project?
 
 🌟 Star it on [GitHub](https://github.com/yourusername/phishing-analyzer)  
-🧠 Or contribute ideas, code, or bugs!
