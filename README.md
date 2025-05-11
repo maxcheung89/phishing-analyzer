@@ -9,6 +9,9 @@
 </p>
 
 ---
+## License
+
+All rights reserved. This project is the sole work of @maxcheung89, and unauthorized use, copying, or distribution is strictly prohibited without express written permission.
 
 ## 🚀 Features
 
