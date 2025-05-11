@@ -1,14 +1,12 @@
-<h1 align="center">🛡️ Phishing Analyzer</h1>
+<div align="center" style="display: flex; align-items: center; justify-content: center; gap: 15px;">
+  <img src="https://github.com/maxcheung89/phishing-analyzer/blob/main/51_20%20PM.png" width="120" alt="PhishScope Logo">
+  <h1 style="margin: 0;">PHISHSCOPE</h1>
+</div>
 
 <p align="center">
   A web-based phishing email and URL analyzer with VirusTotal integration, PCAP capture, and log history.
 </p>
 
-<p align="center">
-  <img src="https://github.com/maxcheung89/phishing-analyzer/blob/main/51_20%20PM.png?raw=true" width="700" alt="Lincense & All right received by $Maxcheung89">
-</p>
-
----
 ## License
 
 All rights reserved. This project is the sole work of @maxcheung89, and unauthorized use, copying, or distribution is strictly prohibited without express written permission.
